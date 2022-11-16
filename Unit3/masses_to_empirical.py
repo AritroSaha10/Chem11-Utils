@@ -1,6 +1,13 @@
 import json
 from pprint import pprint
 from math import gcd
+from functools import reduce
+
+def lcm(a, b):
+    return abs(a*b) // gcd(a, b) if a and b else 0
+
+def multiple_lcm(numbers):
+    return reduce(lcm, numbers)
 
 def main():
     periodic_table = None
@@ -14,15 +21,15 @@ def main():
     periodic_table = periodic_table['elements']
 
     # Give user instructions
-    print("Provide the percentage compositions of elements in this format:")
-    print("C 20%")
-    print("H 10%")
-    print("O 70%")
+    print("Provide the masses of elements in this format:")
+    print("C 20g")
+    print("H 10g")
+    print("O 70g")
     print("Enter 'stop' when you're done.")
 
     # Collect user input on elements & percentages
     element_info = {}
-    percentage_sum = 0
+    mass_sum = 0
 
     collecting_input = True
     while collecting_input:
@@ -31,51 +38,39 @@ def main():
             collecting_input = False
             break
         else:
-            # Split the input into element and percentage
+            # Split the input into element and mass
             split_user_input = user_input.split(" ")
-            
-            if len(split_user_input) == 1:
-                # Assume remaining amount belongs to element, but make sure with user in case of typo
-                confirmation = input("Looks like you didn't input a percentage value. Assume that remaining mass belongs to this element? (Y/n) ").lower()
-                if confirmation != "n":
-                    # Change percentage value to remaining percentage
-                    split_user_input += [str((1 - percentage_sum) * 100)]
-                    # Don't collect any other percentages after this
-                    collecting_input = False
-                else:
-                    print("Skipping entry. Enter another entry below.")
-                    continue
 
-            element, percentage_raw = split_user_input
-            percentage = float(percentage_raw.replace("%", ""))
+            element, mass_raw = split_user_input
+            mass = float(mass_raw.replace("g", ""))
 
             # Get molar mass of element
             molar_mass = None
             for element_dict in periodic_table:
                 if element_dict['symbol'] == element:
-                    molar_mass = element_dict['atomic_mass']
+                    # Round to decimal points since that's generally what's done in class
+                    molar_mass = round(element_dict['atomic_mass'], 2)
                     break
 
             assert molar_mass != None, "Could not find molar mass for element"
 
             # Calculate moles
-            moles = percentage / molar_mass
+            moles = mass / molar_mass
 
             # Make sure it's not a duplicate
             assert element not in element_info, "Duplicate element"
 
             # Add info to dictionary
             element_info[element] = {
-                'percentage': percentage / 100,
+                'mass': mass,
                 'molar_mass': molar_mass,
                 'moles': moles
             }
 
             # Add to percentage sum
-            percentage_sum += percentage / 100
+            mass_sum += mass
     
     assert len(element_info) > 0, "No elements provided"
-    assert percentage_sum == 1, "Sum of all percentages != 0"
 
     # Get smallest mole amount
     smallest_mole_amount = None
@@ -99,16 +94,21 @@ def main():
             factors.append(whole_factor)
     
     # Get greatest common denominator of all factors
-    subscript_factor_gcd = factors[0] if len(factors) > 0 else 1
-    if len(factors) > 1:
-        subscript_factor_gcd = gcd(*factors)
+    subscript_factor = multiple_lcm([1, 1] + factors)
 
     # Multiply all of the subscripts by this number
     for element, info in element_info.items():
         old_subscript = element_info[element]['subscript']
-        element_info[element]['subscript'] = old_subscript * subscript_factor_gcd
+        element_info[element]['subscript'] = old_subscript * subscript_factor
 
-    pprint(element_info)
+    for element, info in element_info.items():
+        print(f"{element}:")
+        print(f"  Mass: {info['mass']}g")
+        print(f"  Molar mass: {info['molar_mass']} g/mol")
+        print(f"  Moles: {info['moles']} mol")
+        print(f"  Subscript: {info['subscript']}")
+        print(f"  Mass percentage: {round(info['mass'] / mass_sum * 100, 2)}%")
+        print()
 
     # Create empirical formula
     empirical_formula = ""

@@ -1,6 +1,13 @@
 import json
 from pprint import pprint
 from math import gcd
+from functools import reduce
+
+def lcm(a, b):
+    return abs(a*b) // gcd(a, b) if a and b else 0
+
+def multiple_lcm(numbers):
+    return reduce(lcm, numbers)
 
 def main():
     periodic_table = None
@@ -14,15 +21,15 @@ def main():
     periodic_table = periodic_table['elements']
 
     # Give user instructions
-    print("Provide the masses of elements in this format:")
-    print("C 20g")
-    print("H 10g")
-    print("O 70g")
+    print("Provide the percentage compositions of elements in this format:")
+    print("C 20%")
+    print("H 10%")
+    print("O 70%")
     print("Enter 'stop' when you're done.")
 
     # Collect user input on elements & percentages
     element_info = {}
-    mass_sum = 0
+    percentage_sum = 0
 
     collecting_input = True
     while collecting_input:
@@ -31,11 +38,23 @@ def main():
             collecting_input = False
             break
         else:
-            # Split the input into element and mass
+            # Split the input into element and percentage
             split_user_input = user_input.split(" ")
+            
+            if len(split_user_input) == 1:
+                # Assume remaining amount belongs to element, but make sure with user in case of typo
+                confirmation = input("Looks like you didn't input a percentage value. Assume that remaining mass belongs to this element? (Y/n) ").lower()
+                if confirmation != "n":
+                    # Change percentage value to remaining percentage
+                    split_user_input += [str((1 - percentage_sum) * 100)]
+                    # Don't collect any other percentages after this
+                    collecting_input = False
+                else:
+                    print("Skipping entry. Enter another entry below.")
+                    continue
 
-            element, mass_raw = split_user_input
-            mass = float(mass_raw.replace("g", ""))
+            element, percentage_raw = split_user_input
+            percentage = float(percentage_raw.replace("%", ""))
 
             # Get molar mass of element
             molar_mass = None
@@ -47,22 +66,23 @@ def main():
             assert molar_mass != None, "Could not find molar mass for element"
 
             # Calculate moles
-            moles = mass / molar_mass
+            moles = percentage / molar_mass
 
             # Make sure it's not a duplicate
             assert element not in element_info, "Duplicate element"
 
             # Add info to dictionary
             element_info[element] = {
-                'mass': mass,
+                'percentage': percentage / 100,
                 'molar_mass': molar_mass,
                 'moles': moles
             }
 
             # Add to percentage sum
-            mass_sum += mass
+            percentage_sum += percentage / 100
     
     assert len(element_info) > 0, "No elements provided"
+    assert percentage_sum == 1, "Sum of all percentages != 0"
 
     # Get smallest mole amount
     smallest_mole_amount = None
@@ -85,17 +105,21 @@ def main():
             whole_factor = decimal_as_ratio[1] # denom can be mult to make decimal whole
             factors.append(whole_factor)
     
-    # Get greatest common denominator of all factors
-    subscript_factor_gcd = factors[0] if len(factors) > 0 else 1
-    if len(factors) > 1:
-        subscript_factor_gcd = gcd(*factors)
+    # Get LCM of all factors
+    subscript_factor = multiple_lcm(factors + [1, 1])
 
     # Multiply all of the subscripts by this number
     for element, info in element_info.items():
         old_subscript = element_info[element]['subscript']
-        element_info[element]['subscript'] = old_subscript * subscript_factor_gcd
+        element_info[element]['subscript'] = old_subscript * subscript_factor
 
-    pprint(element_info)
+    for element, info in element_info.items():
+        print(f"{element}:")
+        print(f"  Percentage: {info['percentage']}%")
+        print(f"  Molar mass: {info['molar_mass']} g/mol")
+        print(f"  Moles: {info['moles']} mol")
+        print(f"  Subscript: {info['subscript']}")
+        print()
 
     # Create empirical formula
     empirical_formula = ""
